@@ -1,31 +1,49 @@
 extern crate rustyline;
 
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::{DefaultEditor, Result};
 
-fn main() {
-    // `()` can be used when no completer is required
-    let mut rl = Editor::<()>::new();
-    if rl.load_history(".mal-history").is_err() {
-        eprintln!("No previous history.");
+fn read(rl: &mut DefaultEditor) -> Result<String> {
+    rl.readline("user > ")
+}
+
+fn eval(line: String) -> Result<String> {
+    Ok(line)
+}
+
+fn print(s: String) -> Result<()> {
+    println!("{}", s);
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let mut rl = DefaultEditor::new()?;
+    #[cfg(feature = "with-file-history")]
+    if rl.load_history("history.txt").is_err() {
+        println!("No previous history.");
     }
-
     loop {
-        let readline = rl.readline("user> ");
+        let readline = read(&mut rl);
         match readline {
             Ok(line) => {
-                rl.add_history_entry(&line);
-                rl.save_history(".mal-history").unwrap();
-                if line.len() > 0 {
-                    println!("{}", line);
-                }
+                rl.add_history_entry(line.as_str())?;
+                print(eval(line)?)?;
             }
-            Err(ReadlineError::Interrupted) => continue,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
             Err(err) => {
                 println!("Error: {:?}", err);
                 break;
             }
         }
     }
+    #[cfg(feature = "with-file-history")]
+    rl.save_history("history.txt");
+    Ok(())
 }
