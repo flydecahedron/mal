@@ -1,24 +1,9 @@
+use crate::error::Error;
+use crate::types::Value;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{self, Display},
 };
-extern crate thiserror;
-use self::thiserror::Error;
-use crate::types::Value;
-
-#[derive(Error, Debug)]
-enum Error {
-    #[error("No next character: {0}")]
-    NoNextCharacter(Token),
-    #[error("Unknown character: {0}")]
-    UnknownCharacter(Token),
-    #[error("Unexpected character, reader bug!: {0}")]
-    UnexpectedCharacter(Token),
-    #[error("Invalid number: {0}")]
-    InvalidNumber(Token),
-    #[error("Unterminated string: {0}")]
-    UnterminatedString(Token),
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
@@ -417,6 +402,12 @@ impl Parser<'_> {
 
 fn token_to_string(token: &Token, input: &str) -> String {
     input[token.start..token.end].to_string()
+}
+
+pub fn read(input: &str) -> Result<Value, Error> {
+    let tokens = tokenize(input)?;
+    let mut parser = Parser::new(tokens, input);
+    parser.parse()
 }
 
 #[cfg(test)]

@@ -1,36 +1,45 @@
 extern crate rustyline;
 
+mod error;
 mod printer;
 mod reader;
 mod types;
+
+use error::Error;
+use printer::print_value;
+use reader::read;
 use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Result};
+use rustyline::{DefaultEditor, Result as ReadlineResult};
+use std::result::Result;
+use types::Value;
 
-fn read(rl: &mut DefaultEditor) -> Result<String> {
-    rl.readline("user > ")
+fn eval(ast: &mut Value) -> Result<&Value, Error> {
+    Ok(ast)
 }
 
-fn eval(line: String) -> Result<String> {
-    Ok(line)
-}
-
-fn print(s: String) -> Result<()> {
-    println!("{}", s);
+fn print(ast: &Value) -> Result<(), Error> {
+    print_value(ast);
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let mut rl = DefaultEditor::new()?;
+fn read_eval_print(input: &str) -> Result<(), Error> {
+    let mut ast = read(input).unwrap();
+    eval(&mut ast)?;
+    print(&ast)?;
+    Ok(())
+}
+fn main() -> Result<(), Error> {
+    let mut rl = DefaultEditor::new().unwrap();
     #[cfg(feature = "with-file-history")]
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
     loop {
-        let readline = read(&mut rl);
+        let readline = rl.readline("user >");
         match readline {
             Ok(line) => {
-                rl.add_history_entry(line.as_str())?;
-                print(eval(line)?)?;
+                rl.add_history_entry(line.as_str()).unwrap();
+                read_eval_print(&line)?;
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
