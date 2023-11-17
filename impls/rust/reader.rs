@@ -20,8 +20,8 @@ enum Error {
     UnterminatedString(Token),
 }
 
-#[derive(Debug, PartialEq)]
-enum TokenType {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
     // Single character tokens
     LeftParen,
     RightParen,
@@ -61,17 +61,43 @@ enum TokenType {
 
 impl Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            TokenType::Plus => write!(f, "+"),
+            TokenType::Minus => write!(f, "-"),
+            TokenType::Star => write!(f, "*"),
+            TokenType::Slash => write!(f, "/"),
+            TokenType::Dot => write!(f, "."),
+            TokenType::Comma => write!(f, ","),
+            TokenType::LeftParen => write!(f, "("),
+            TokenType::RightParen => write!(f, ")"),
+            TokenType::LeftBrace => write!(f, "{{"),
+            TokenType::RightBrace => write!(f, "}}"),
+            TokenType::LeftBracket => write!(f, "["),
+            TokenType::RightBracket => write!(f, "]"),
+            TokenType::Semicolon => write!(f, ";"),
+            TokenType::Equal => write!(f, "="),
+            TokenType::Tilde => write!(f, "~"),
+            TokenType::AtSign => write!(f, "@"),
+            TokenType::Backtick => write!(f, "`"),
+            TokenType::SingleQuote => write!(f, "'"),
+            TokenType::Let => write!(f, "let"),
+            TokenType::Fn => write!(f, "fn"),
+            TokenType::Quote => write!(f, "quote"),
+            TokenType::Quasiquote => write!(f, "quasiquote"),
+            TokenType::Unquote => write!(f, "unquote"),
+            TokenType::UnquoteSplicing => write!(f, "unquote-splicing"),
+            _ => write!(f, "{:?}", self),
+        }
     }
 }
 
-#[derive(Debug)]
-struct Token {
+#[derive(Debug, Clone)]
+pub struct Token {
     token_type: TokenType,
     start: usize,
     end: usize,
     line: usize,
-    value: Option<Value>,
+    // value: Option<Value>,
 }
 
 impl Display for Token {
@@ -160,7 +186,7 @@ impl<'a> Lexer<'a> {
                 }
             },
 
-            None => return Err(Error::NoNextCharacter(self.create_error())),
+            None => return Ok(self.create_token(TokenType::EOF)),
         }
     }
 
@@ -191,9 +217,9 @@ impl<'a> Lexer<'a> {
             start: self.start,
             end: self.current,
             line: self.line,
-            value: Some(Value::String(
-                self.input[self.start + 1..self.current - 1].to_string(),
-            )),
+            // value: Some(Value::String(
+            //     self.input[self.start + 1..self.current - 1].to_string(),
+            // )),
         })
     }
 
@@ -237,9 +263,9 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
         let mut token = self.create_token(TokenType::Number);
-        token.value = Some(Value::Number(
-            self.input[self.start..self.current].parse().unwrap(),
-        ));
+        // token.value = Some(Value::Number(
+        //     self.input[self.start..self.current].parse().unwrap(),
+        // ));
         token
     }
 
@@ -250,7 +276,7 @@ impl<'a> Lexer<'a> {
             start: self.start,
             end: self.current,
             line: self.line,
-            value: None,
+            // value: None,
         }
     }
 
@@ -260,9 +286,9 @@ impl<'a> Lexer<'a> {
             start: self.start,
             end: self.current,
             line: self.line,
-            value: Some(Value::Symbol(
-                self.input[self.start..self.current].to_string(),
-            )),
+            // value: Some(Value::Symbol(
+            //     self.input[self.start..self.current].to_string(),
+            // )),
         }
     }
 
@@ -273,9 +299,9 @@ impl<'a> Lexer<'a> {
             start: self.start,
             end: self.current,
             line: self.line,
-            value: Some(Value::Symbol(
-                self.input[self.start..self.current].to_string(),
-            )),
+            // value: Some(Value::Symbol(
+            //     self.input[self.start..self.current].to_string(),
+            // )),
         }
     }
 
@@ -315,18 +341,18 @@ fn tokenize(input: &str) -> Result<Vec<Token>, Error> {
     Ok(tokens)
 }
 
-struct Parser {
+struct Parser<'a> {
     tokens: Vec<Token>,
     index: usize,
-    ast: Value,
+    input: &'a str,
 }
 
-impl Parser {
-    fn new(tokens: Vec<Token>) -> Parser {
+impl Parser<'_> {
+    fn new(tokens: Vec<Token>, input: &str) -> Parser {
         Parser {
             tokens,
             index: 0,
-            ast: Value::Null,
+            input,
         }
     }
 
@@ -360,30 +386,17 @@ impl Parser {
     }
 
     fn parse_atom(&mut self) -> Result<Value, Error> {
-        // if let Some(token) = self.peek() {
-        //     match token.token_type {
-        //         TokenType::Number => Ok(Value::Number(self.tokens[self.index])),
-        //         TokenType::String => Ok(Value::String(self.tokens[self.index])),
-        //         TokenType::Symbol => Ok(Value::Symbol(self.tokens[self.index])),
-        //         _ => Ok(Value::Null),
-        //     }
-        //     self.advance();
-        // }
-        // Err(Value::Error(format!(
-        //     "Error parsing token: {:?}",
-        //     self.peek()
-        // )))
-
         match self.peek() {
             Some(token) => match token.token_type {
-                TokenType::Number => Ok(token.value.as_ref().unwrap().clone()),
-                TokenType::String => Ok(Value::String(
-                    token.value.as_ref().unwrap().clone().to_string(),
+                TokenType::Number => Ok(Value::Number(
+                    token_to_string(token, self.input)
+                        .parse()
+                        .expect(format!("{} is not a number", token).as_str()),
                 )),
-                TokenType::Identifier => Ok(Value::Symbol(
-                    token.value.as_ref().unwrap().clone().to_string(),
-                )),
-                _ => Ok(Value::Null),
+                TokenType::String => Ok(Value::String(token_to_string(token, self.input))),
+                TokenType::Identifier => Ok(Value::Symbol(token_to_string(token, self.input))),
+                // TODO explicitly handle keywords
+                _ => Ok(Value::Keyword(token.token_type.clone())),
             },
             None => Ok(Value::Null),
         }
@@ -396,32 +409,50 @@ impl Parser {
     fn advance(&mut self) {
         self.index += 1;
     }
+
+    pub fn parse(&mut self) -> Result<Value, Error> {
+        self.parse_form()
+    }
+}
+
+fn token_to_string(token: &Token, input: &str) -> String {
+    input[token.start..token.end].to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use rustyline::InputMode;
 
+    use super::*;
+    use crate::printer::print_value;
     #[test]
     fn test_number() {
-        let mut reader = Lexer::new("123");
+        let input = "123";
+        let mut reader = Lexer::new(&input);
         let token = reader.next().unwrap();
-        assert_eq!(token.value.unwrap(), Value::Number(123.0));
+        assert_eq!(token.token_type, TokenType::Number);
+        assert_eq!(
+            token_to_string(&token, input).parse::<f64>().unwrap(),
+            123.0
+        );
     }
 
     #[test]
     fn test_string() {
         // TODO quote escaping in strings or at least figure how to properly test it here
-        let mut reader = Lexer::new("\"hello\"");
+        let input = "\"hello\"";
+        let mut reader = Lexer::new(&input);
         let token = reader.next().unwrap();
-        assert_eq!(token.value.unwrap(), Value::String("hello".to_string()));
+        assert_eq!(token.token_type, TokenType::String);
+        assert_eq!(token_to_string(&token, input).as_str(), "hello");
     }
 
     #[test]
     fn test_symbol() {
         let mut reader = Lexer::new("hello");
         let token = reader.next().unwrap();
-        assert_eq!(token.value.unwrap(), Value::Symbol("hello".to_string()));
+        assert_eq!(token.token_type, TokenType::Identifier);
+        assert_eq!(token_to_string(&token, "hello").as_str(), "hello");
     }
 
     #[test]
@@ -457,10 +488,11 @@ mod tests {
 
     #[test]
     fn test_comments() {
-        let mut reader = Lexer::new("; hello \t\n\r   sym");
+        let input = "; hello \t\n\r   sym";
+        let mut reader = Lexer::new(&input);
         let token = reader.next().unwrap();
         assert_eq!(token.token_type, TokenType::Identifier);
-        assert_eq!(token.value, Some(Value::Symbol("sym".to_string())));
+        assert_eq!(token_to_string(&token, input), "sym");
     }
 
     #[test]
@@ -476,7 +508,7 @@ mod tests {
 
         let input = "\"hello\"";
         let tokens = tokenize(input).unwrap();
-        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].token_type, TokenType::String);
         assert_eq!(tokens[1].token_type, TokenType::EOF);
 
@@ -523,5 +555,24 @@ mod tests {
         // assert_eq!(tokens[37].token_type, TokenType::Number);
         // assert_eq!(tokens[38].token_type, TokenType::Number);
         // assert_eq!(tokens[39].token_type, TokenType::RightParen);
+    }
+
+    #[test]
+    fn test_parser() {
+        println!("{:?}", TokenType::Quasiquote);
+        let input = "(  +   1   2   ) ; should be ignored";
+        let tokens = tokenize(&input).unwrap();
+        let mut parser = Parser::new(tokens, input);
+        let ast = parser.parse().unwrap();
+        print_value(&ast);
+
+        let mut right = VecDeque::new();
+        right.push_back(Value::Keyword(TokenType::Plus));
+        right.push_back(Value::Number(1.0));
+        right.push_back(Value::Number(2.0));
+        let right = Value::List(right);
+        assert_eq!(ast, right);
+
+        assert_eq!(ast.to_string(), "(+ 1 2)");
     }
 }

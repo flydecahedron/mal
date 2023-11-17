@@ -13,8 +13,15 @@ impl Display for Value {
             },
             Value::List(x) => {
                 write!(f, "(")?;
+                // Iterate over list except for the last element
+                // to avoid a trailing space
                 for elem in x.iter() {
                     write!(f, "{}", elem)?;
+                    // Print a space unless on the last element of the list
+                    // TODO do this better
+                    if elem != x.back().unwrap() {
+                        write!(f, " ")?;
+                    }
                 }
                 write!(f, ")")
             }
@@ -35,6 +42,11 @@ impl Display for Value {
             Value::Symbol(x) => write!(f, "{}", x),
             Value::Null => write!(f, "null"),
             Value::Error(x) => write!(f, "{}", x),
+            Value::Keyword(x) => write!(f, "{}", x),
         }
     }
+}
+
+pub fn print_value(v: &Value) {
+    println!("{}", v);
 }
